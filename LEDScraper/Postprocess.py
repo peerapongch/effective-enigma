@@ -62,6 +62,9 @@ def run_postprocess(out_dict):
     data[auction_status_cols] = data[auction_status_cols].fillna('NA')
     data[auction_date_cols] = data[auction_date_cols].fillna('01/01/2022') # some arbitrary date in the past
 
+    # cleaning: auction identifiers
+    data['auction_identifier'] = data[['lot_no','sequence_no']].agg('|'.join, axis=1)
+
     # postprocess: auction rounds
     data['all_auction_status'] = data[auction_status_cols].agg('|'.join, axis=1)
     data['asset_status'] = [
@@ -73,6 +76,7 @@ def run_postprocess(out_dict):
     # reorder columns
     cols = data.columns
     focus_cols = [
+        'auction_identifier',
         'asset_status',
         'next_auction_date',
         'next_auction_round',
@@ -81,12 +85,12 @@ def run_postprocess(out_dict):
         'subdistrict',
         'lot_no',
         'sequence_no',
-        'deed_no',
-        'case_id',
-        'asset_type',
-        'area_rai',
-        'area_ngan',
-        'area_sqwam',
+        # 'deed_no',
+        # 'case_id',
+        # 'asset_type',
+        # 'area_rai',
+        # 'area_ngan',
+        # 'area_sqwam',
         'total_area_sqwa',
         'total_area_sqm',
         'max_start_price',

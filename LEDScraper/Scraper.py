@@ -393,9 +393,9 @@ def scraper_extract(driver, out_dict, province, district):
                     'area_ngan': format_number(entry.find_elements_by_css_selector('td')[5].text),
                     'area_sqwam': format_number(entry.find_elements_by_css_selector('td')[6].text),
                     'assigned_start_price': format_number(entry.find_elements_by_css_selector('td')[7].text),
-                    'subdistrict': entry.find_elements_by_css_selector('td')[8].text,
-                    'district': entry.find_elements_by_css_selector('td')[9].text,
-                    'province': province
+                    'subdistrict': entry.find_elements_by_css_selector('td')[8].text.replace(' ',''),
+                    'district': entry.find_elements_by_css_selector('td')[9].text.replace(' ',''),
+                    'province': province.replace(' ','')
                 }
 
                 try:
