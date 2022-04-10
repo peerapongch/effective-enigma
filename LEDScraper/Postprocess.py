@@ -228,6 +228,8 @@ def find_location(
                         )
                     )
                     
+                    time.sleep(2)
+                    
                     coor = driver.find_elements_by_xpath(
                         '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[10]/div[2]/a'
                     )[0].text
@@ -262,7 +264,7 @@ def find_location(
                 except Exception as e:
                     
                     print(f'District: {d}; Deed: {deed}; Coordinates: NA; Price NA; Gmap: NA')
-                    # raise(e)
+                    print(e)
                     pass
                     
     if len(possible_locations)==0:
