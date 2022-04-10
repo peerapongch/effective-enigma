@@ -14,6 +14,7 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
 from .Mappers import *
+from .DBConfig import MAX_SCHEMA
 
 def run_postprocess(out_dict):
 
@@ -39,7 +40,8 @@ def run_postprocess(out_dict):
             except:
               return pd.Series(['NA-nofuture','NA-nofuture'])           
 
-    data = pd.DataFrame(out_dict.values())
+    data = pd.DataFrame.from_dict(out_dict,orient='index')\
+    .reset_index().rename({'index':'entry_id'},axis=1)
 
     # postprocess: area
     data['total_area_sqwa'] = [
@@ -58,6 +60,9 @@ def run_postprocess(out_dict):
             data['asset_type']
         )
     ]
+
+    # postprocess: columns and nulls
+    data = correct_columns(data)
 
     # postprocess: price
     data['max_start_thb_per_sqwa'] = data['max_start_price']/data['total_area_sqwa']
@@ -85,7 +90,7 @@ def run_postprocess(out_dict):
     data['asset_status'] = [
         'unavailable' if (x.find('ขายได้')!=-1) | (x.find('ถอน')!=-1) else 'available' for x in data['all_auction_status']
     ]
-    data[['next_auction_date','next_auction_round']] = \
+    data[['next_date','next_round']] = \
     data[auction_date_cols+['asset_status']].apply(earliest_next,axis=1)
 
     # reorder columns
@@ -93,8 +98,8 @@ def run_postprocess(out_dict):
     focus_cols = [
         'auction_identifier',
         'asset_status',
-        'next_auction_date',
-        'next_auction_round',
+        'next_date',
+        'next_round',
         'province',
         'district',
         'subdistrict',
@@ -120,6 +125,18 @@ def run_postprocess(out_dict):
     new_cols = focus_cols + remaining_cols
     
     return data[new_cols]
+
+def correct_columns(
+    data,
+    max_schema=MAX_SCHEMA
+):
+    current_cols = data.columns
+    for col in max_schema.keys():
+        if col not in current_cols:
+            data[col] = max_schema[col]
+        else:
+            data[col] = data[col].fillna(max_schema[col])
+    return data
 
 def get_deed_range(x):
     
@@ -183,7 +200,9 @@ def find_location(
 
         entry_province = entry['province']
         entry_district = entry['district']
-        possible_districts = district_mapper[entry_province][entry_district.replace(' ','')]
+
+        clean_province = PROVINCE_MAPPER[entry_province]
+        possible_districts = DISTRICT_MAPPER[entry_province][entry_district.replace(' ','')]
 
         # print(possible_districts)
 
@@ -192,6 +211,9 @@ def find_location(
             # print(entry['deed_no'].split(','))
             
             for deed in entry['deed_no'].split(','):
+
+                prov_select = Select(driver.find_elements_by_xpath('/html/body/nav/form[1]/div/select')[0])
+                prov_select.select_by_visible_text(clean_province)
 
                 district_select = Select(driver.find_elements_by_xpath('/html/body/nav/form[2]/div/select')[0])
                 district_select.select_by_visible_text(d)
@@ -276,8 +298,38 @@ def find_location(
     
     return pd.Series(results)
 
-def par_find_location(
-    data,
-    n_partitions=4
+def run_location_finder(
+    driver,
+    data
     ):
-    pass
+
+    location_search_url = 'https://landsmaps.dol.go.th/'
+    driver.get(location_search_url)
+
+    do_find = data[
+        (data['asset_status']=='available')\
+        & (data['loc_coordinates']=='NA')
+    ]
+    if do_find.shape[0]>0:
+        do_find[[
+            'loc_coordinates',
+            'loc_google_maps',
+            'loc_price_per_unit',
+            'loc_district',
+            'loc_deed',
+            'loc_possibilities'
+        ]] = do_find.apply(
+            find_location,
+            axis=1,
+            driver=driver
+        )
+    else:
+        print('-'*30)
+        print('No location to search')
+
+    dont_find = data[
+        ~(data['asset_status']=='available')\
+        | ~(data['loc_coordinates']=='NA')
+    ]
+
+    return pd.concat([do_find,dont_find])

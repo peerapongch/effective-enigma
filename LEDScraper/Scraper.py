@@ -12,7 +12,7 @@ import os
 import pickle
 from tqdm import tqdm
 
-def select_provice(driver, province='กรุงเทพมหานคร'):
+def select_province(driver, province='กรุงเทพมหานคร'):
     # province selection
     prov_xpath = '/html/body/div[4]/div/div/div/div/div[3]/div/div[1]/table/tbody/tr/td[2]/select'
 
@@ -119,6 +119,13 @@ def deep_extract(driver,entry_id,out_dict,asset_type='property'):
         deposit_xpath = '/html/body/div[1]/div/div/div[6]/strong[1]/font'
         condition_xpath = '/html/body/div[1]/div/div/div[5]/div/h5'
     
+    wait = WebDriverWait(driver, 3)\
+    .until(
+        EC.presence_of_element_located(
+            (By.XPATH, info_table_xpath)
+        )
+    )
+
     info_data = info_extract(
         driver,
         auction_order_xpath=auction_order_xpath,
@@ -365,70 +372,66 @@ def scraper_extract(driver, out_dict, province, district):
 
         for entry in tqdm(main_table.find_elements_by_css_selector('tr')):
 
-            # get entry_id
-            entry_id = '|'.join([
-              x.text.strip() for x in entry.find_elements_by_css_selector('td')
-            ])
-
-            # print(entry_id)
             asset_type = entry.find_elements_by_css_selector('td')[3].text
             asset_type = 'property' if asset_type!='หุ้น' else 'equity'
 
+            def format_number(string):
+                return np.round(float(string.replace('-','0').replace(',','')),4)
+
+            # initial entry info
+            entry_info = {
+                'lot_no': entry.find_elements_by_css_selector('td')[0].text,
+                'sequence_no': entry.find_elements_by_css_selector('td')[1].text,
+                'case_id': entry.find_elements_by_css_selector('td')[2].text,
+                'asset_type': entry.find_elements_by_css_selector('td')[3].text,
+                'area_rai': format_number(entry.find_elements_by_css_selector('td')[4].text),
+                'area_ngan': format_number(entry.find_elements_by_css_selector('td')[5].text),
+                'area_sqwam': format_number(entry.find_elements_by_css_selector('td')[6].text),
+                'assigned_start_price': format_number(entry.find_elements_by_css_selector('td')[7].text),
+                'subdistrict': entry.find_elements_by_css_selector('td')[8].text.replace(' ',''),
+                'district': entry.find_elements_by_css_selector('td')[9].text.replace(' ',''),
+                'province': province.replace(' ','')
+            }
+
+            # enter entry
+            entry.click()
+            driver.switch_to.window(driver.window_handles[1])
+
+            # url
+            entry_url = driver.current_url
+            entry_info.update(
+                {
+                    'led_url': entry_url
+                }
+            )
+
             #count
             counter[1] += 1
-            # print(f'Processing {counter}-th entry')
 
-            if entry_id not in out_dict.keys():
-
-                def format_number(string):
-                    return np.round(float(string.replace('-','0').replace(',','')),4)
-
-                # initial entry info
-                out_dict[entry_id] = {
-                    'lot_no': entry.find_elements_by_css_selector('td')[0].text,
-                    'sequence_no': entry.find_elements_by_css_selector('td')[1].text,
-                    'case_id': entry.find_elements_by_css_selector('td')[2].text,
-                    'asset_type': entry.find_elements_by_css_selector('td')[3].text,
-                    'area_rai': format_number(entry.find_elements_by_css_selector('td')[4].text),
-                    'area_ngan': format_number(entry.find_elements_by_css_selector('td')[5].text),
-                    'area_sqwam': format_number(entry.find_elements_by_css_selector('td')[6].text),
-                    'assigned_start_price': format_number(entry.find_elements_by_css_selector('td')[7].text),
-                    'subdistrict': entry.find_elements_by_css_selector('td')[8].text.replace(' ',''),
-                    'district': entry.find_elements_by_css_selector('td')[9].text.replace(' ',''),
-                    'province': province.replace(' ','')
-                }
-
+            if entry_url not in out_dict.keys():
+            
                 try:
-
-                    # enter entry
-                    entry.click()
-                    driver.switch_to.window(driver.window_handles[1])
-
-                    # url
-                    out_dict[entry_id].update({
-                        'led_url' : driver.current_url
-                    })
-
-                    out_dict[entry_id].update(
-                            deep_extract(
-                            driver,
-                            entry_id,
-                            out_dict,
-                            asset_type = asset_type
-                        )
+                    out_dict[entry_url] = deep_extract(
+                        driver,
+                        entry_url,
+                        out_dict,
+                        asset_type = asset_type
                     )
 
-                except:
-
-                    print(f'Error extraction of {district}: {current_page}: {entry_id}')
+                except Exception as e:
+                    out_dict[entry_url] = {}
+                    print(f'Error extraction of {district}: {current_page}: {entry_url}: {e}')
 
                 finally:
+                    out_dict[entry_url].update(
+                        entry_info
+                    )
 
-                    # close tab
-                    driver.close()
-                    driver.switch_to.window(driver.window_handles[0])
+            # close tab
+            driver.close()
+            driver.switch_to.window(driver.window_handles[0])
 
-                    counter[0] += 1
+            counter[0] += 1
 
         next_button = driver\
         .find_elements_by_xpath(
