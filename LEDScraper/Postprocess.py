@@ -212,6 +212,13 @@ def find_location(
             
             for deed in entry['deed_no'].split(','):
 
+                wait = WebDriverWait(driver, max_wait_time)\
+                .until(
+                    EC.presence_of_element_located(
+                        (By.XPATH, '/html/body/nav/form[2]/div/select')
+                    )
+                )
+
                 prov_select = Select(driver.find_elements_by_xpath('/html/body/nav/form[1]/div/select')[0])
                 prov_select.select_by_visible_text(clean_province)
 

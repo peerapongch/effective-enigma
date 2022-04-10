@@ -1,7 +1,7 @@
 from LEDScraper.Mappers import *
 
 DRIVER_DIR = "./chromedriver.exe"
-HEADLESS = False
+HEADLESS = True
 
 DATA_DIR = './data'
 LED_SEARCH_URL = 'http://asset.led.go.th/newbidreg/default.asp'
