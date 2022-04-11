@@ -219,8 +219,6 @@ def find_location(
                     )
                 )
 
-                driver.execute_script('el = document.elementFromPoint(47, 457); el.click();')
-
                 prov_select = Select(driver.find_elements_by_xpath('/html/body/nav/form[1]/div/select')[0])
                 prov_select.select_by_visible_text(clean_province)
 
@@ -314,6 +312,20 @@ def run_location_finder(
 
     location_search_url = 'https://landsmaps.dol.go.th/'
     driver.get(location_search_url)
+
+    # close landing layer if exists
+    try:
+        wait = WebDriverWait(driver, 60)\
+        .until(
+            EC.presence_of_element_located(
+                (By.XPATH, '/html/body/div[25]/div/div/div/div[1]/button/i')
+            )
+        )
+        time.sleep(2)
+        close = driver.find_elements_by_xpath('/html/body/div[25]/div/div/div/div[1]/button/i')
+        close[0].click()
+    except:
+        print('button not found')
 
     do_find = data[
         (data['asset_status']=='available')\

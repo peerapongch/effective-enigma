@@ -17,6 +17,7 @@ if __name__ == "__main__":
 	options.add_argument("--start-maximized")
 	if HEADLESS:
 		options.add_argument("--headless")
+		options.add_argument("--disable-gpu")
 	driver = webdriver.Chrome(DRIVER_DIR, options=options)
 
 	while True:
