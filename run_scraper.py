@@ -20,6 +20,9 @@ if __name__ == "__main__":
 		options.add_argument("--disable-gpu")
 	driver = webdriver.Chrome(DRIVER_DIR, options=options)
 
+	loc_last_time = datetime.now()
+	loc_last_status = 'success'
+
 	while True:
 
 		print('-'*30)
@@ -32,6 +35,15 @@ if __name__ == "__main__":
 
 			for district_id in PROVINCE_SCOPE[province]:
 				
+				# loc_last_time, loc_last_status = test_find_location()
+				
+				do_find_location, loc_last_time, loc_last_status = if_find_location(
+					driver,
+					loc_last_time,
+					loc_last_status,
+					cooldown=LOCATION_COOLDOWN
+				)
+
 				driver.get(LED_SEARCH_URL)
 				select_province(driver, province=province)
 				fuck_captcha(driver)
@@ -64,10 +76,17 @@ if __name__ == "__main__":
 				)
 				
 				# find location
-				out_db = run_location_finder(
-					driver,
-					out_db
-				)
+				if do_find_location:
+					print('-'*30)
+					print('Performing location search')
+					out_db, loc_last_time, loc_last_status = run_location_finder(
+						driver,
+						out_db
+					)
+				else:
+					print('-'*30)
+					print('Skipping location search')
+				print(f'Last {loc_last_status} search at {loc_last_time}')
 				
 				# save
 				save_db(

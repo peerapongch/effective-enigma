@@ -10,3 +10,5 @@ PROVINCE_LIST = ['กรุงเทพมหานคร']
 PROVINCE_SCOPE = {
   x: list(LED_DISTRICT_ID[x].keys()) for x in PROVINCE_LIST
 }
+
+LOCATION_COOLDOWN = 10800

@@ -174,7 +174,7 @@ def find_location(
     max_wait_time=5,
     driver_path='./chromedriver.exe',
     led_search_url='https://landsmaps.dol.go.th/',
-    headless=True
+    headless=False
     ):
 
     if not driver:
@@ -307,10 +307,10 @@ def find_location(
 
 def run_location_finder(
     driver,
-    data
+    data,
+    location_search_url = 'https://landsmaps.dol.go.th/'
     ):
 
-    location_search_url = 'https://landsmaps.dol.go.th/'
     driver.get(location_search_url)
 
     # close landing layer if exists
@@ -331,26 +331,148 @@ def run_location_finder(
         (data['asset_status']=='available')\
         & (data['loc_coordinates']=='NA')
     ]
+    loc_last_status = 'success'
+
     if do_find.shape[0]>0:
-        do_find[[
-            'loc_coordinates',
-            'loc_google_maps',
-            'loc_price_per_unit',
-            'loc_district',
-            'loc_deed',
-            'loc_possibilities'
-        ]] = do_find.apply(
-            find_location,
-            axis=1,
-            driver=driver
-        )
+
+        for index, row in do_find.iterrows():
+            # do_find[[
+            #     'loc_coordinates',
+            #     'loc_google_maps',
+            #     'loc_price_per_unit',
+            #     'loc_district',
+            #     'loc_deed',
+            #     'loc_possibilities'
+            # ]] = do_find.apply(
+            #     find_location,
+            #     axis=1,
+            #     driver=driver
+            # )
+
+            row_update = find_location(
+                row,
+                driver=driver
+            )
+            do_find.loc[
+                index,
+                [
+                    'loc_coordinates',
+                    'loc_google_maps',
+                    'loc_price_per_unit',
+                    'loc_district',
+                    'loc_deed',
+                    'loc_possibilities'
+                ]
+            ] = row_update.values
+        
+        cant_find_any = all([x == 'NA' for x in do_find['loc_coordinates'].tolist()])
+        loc_last_status = 'failure' if cant_find_any else 'success'
+
     else:
         print('-'*30)
         print('No location to search')
+        # loc_last_status remains success
 
     dont_find = data[
         ~(data['asset_status']=='available')\
         | ~(data['loc_coordinates']=='NA')
     ]
 
-    return pd.concat([do_find,dont_find])
+    return pd.concat([do_find,dont_find]), datetime.now(), loc_last_status
+
+def if_find_location(
+    driver,
+    loc_last_time,
+    loc_last_status,
+    cooldown=10800
+    ):
+
+    do_find_loc = False
+
+    if loc_last_status == 'success':
+        do_find_loc = True
+    elif (datetime.now()-loc_last_time).seconds>cooldown:
+        loc_last_time, loc_last_status = test_find_location(driver)
+        if loc_last_status == 'success':
+            do_find_loc = True
+
+    return do_find_loc, loc_last_time, loc_last_status
+
+def test_find_location(
+    driver,
+    led_search_url='https://landsmaps.dol.go.th/'
+    ):
+    
+    print('-'*30)
+    print('Testing location search with known deed')
+    
+    driver.get(location_search_url)
+
+    # close landing layer if exists
+    try:
+        wait = WebDriverWait(driver, 60)\
+        .until(
+            EC.presence_of_element_located(
+                (By.XPATH, '/html/body/div[25]/div/div/div/div[1]/button/i')
+            )
+        )
+        time.sleep(2)
+        close = driver.find_elements_by_xpath('/html/body/div[25]/div/div/div/div[1]/button/i')
+        close[0].click()
+    except:
+        print('button not found')
+
+    prov_select = Select(driver.find_elements_by_xpath('/html/body/nav/form[1]/div/select')[0])
+    prov_select.select_by_visible_text('กรุงเทพมหานคร')
+
+    district_select = Select(driver.find_elements_by_xpath('/html/body/nav/form[2]/div/select')[0])
+    district_select.select_by_visible_text('38-ลาดพร้าว')
+
+    deed_box = driver\
+    .find_elements_by_xpath(
+        '/html/body/nav/form[3]/span/input'
+    )[0]
+
+    deed_box.clear()
+    deed_box.send_keys('2234')
+    deed_box.send_keys(Keys.ENTER)
+
+    try:
+
+        wait = WebDriverWait(driver, max_wait_time)\
+        .until(
+            EC.presence_of_element_located(
+                (By.XPATH, '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[9]/div[2]')
+            )
+        )
+        
+        time.sleep(2)
+        
+        coor = driver.find_elements_by_xpath(
+            '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[10]/div[2]/a'
+        )[0].text
+
+        gmap = driver.find_elements_by_xpath(
+            '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[10]/div[2]/a'
+        )[0].get_attribute('href')
+
+        price = driver.find_elements_by_xpath(
+            '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[9]/div[2]'
+        )[0].text.split(' ')[0]
+
+        price_unit = driver.find_elements_by_xpath(
+            '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[9]/div[2]'
+        )[0].text.split(' ')[1]
+
+        loc_last_status = 'success'
+
+        print('-'*30)
+        print('Time out expired: Location search activated')
+            
+    except Exception as e:
+
+        loc_last_status = 'failure'
+        print('-'*30)
+        print('Time out persists: Consider increasing cooldown value')
+
+    return datetime.now(), loc_last_status
