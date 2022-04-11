@@ -219,6 +219,8 @@ def find_location(
                     )
                 )
 
+                driver.execute_script('el = document.elementFromPoint(47, 457); el.click();')
+
                 prov_select = Select(driver.find_elements_by_xpath('/html/body/nav/form[1]/div/select')[0])
                 prov_select.select_by_visible_text(clean_province)
 
