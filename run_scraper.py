@@ -18,7 +18,8 @@ def load_state():
 		return {}
 
 def set_state(STATE,var,value):
-	return STATE[var] = value
+	STATE[var] = value
+	return STATE
 
 def save_state(STATE):
 	pickle.dump(STATE,open('state.pickle','wb'))
