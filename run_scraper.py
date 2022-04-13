@@ -1,6 +1,7 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from datetime import datetime
+import pickle
 
 from config import *
 
@@ -8,6 +9,25 @@ from LEDScraper.Scraper import *
 from LEDScraper.Postprocess import *
 from LEDScraper.Mappers import *
 from LEDScraper.DataInterface import *
+
+def load_state():
+	state_path = 'state.pickle'
+	if os.path.isfile(state_path):
+		return pickle.load(open(state_path,'rb'))
+	else:
+		return {}
+
+def set_state(STATE,var,value):
+	return STATE[var] = value
+
+def save_state(STATE):
+	pickle.dump(STATE,open('state.pickle','wb'))
+	return True
+
+def make_sequence(pointer,original_seq):
+	new_seq = list(original_seq)
+	index = new_seq.index(pointer)
+	return new_seq[index:] + new_seq[:index]
 
 if __name__ == "__main__":
 
@@ -23,17 +43,30 @@ if __name__ == "__main__":
 	loc_last_time = datetime.now()
 	loc_last_status = 'success'
 
+	# get state
+	STATE = load_state()
+
 	while True:
 
 		print('-'*30)
 		print(datetime.now())
 
-		for province in PROVINCE_SCOPE.keys():
+		province_seq = make_sequence(
+			STATE['last_province'],
+			PROVINCE_SCOPE.keys()
+		)
+
+		for province in province_seq:
 
 			eng_province = ENG_TRANSLATE_PROVINCE[province]
 			district_dict = LED_DISTRICT_ID[province]
 
-			for district_id in PROVINCE_SCOPE[province]:
+			district_id_seq = make_sequence(
+				STATE['last_district_id'],
+				PROVINCE_SCOPE[province]
+			)
+
+			for district_id in district_id_seq:
 				
 				# loc_last_time, loc_last_status = test_find_location()
 				
@@ -95,3 +128,7 @@ if __name__ == "__main__":
 					province = eng_province,
 					district_id = str(district_id)
 				)
+
+				STATE = set_state(STATE, 'last_province', province)
+				STATE = set_state(STATE, 'last_district_id', district_id)
+				save_state(STATE)
