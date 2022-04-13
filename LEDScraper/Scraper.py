@@ -397,41 +397,55 @@ def scraper_extract(driver, out_dict, province, district):
             entry.click()
             driver.switch_to.window(driver.window_handles[1])
 
-            # url
-            entry_url = driver.current_url
-            entry_info.update(
-                {
-                    'led_url': entry_url
-                }
-            )
+            try:
+                # detect a 
+                wait = WebDriverWait(driver, 5)\
+                .until(
+                    EC.presence_of_element_located(
+                        (By.XPATH, '/html/body/div[1]/div/div/div[1]/table[2]/tbody/tr/td[1]/strong/font/font')
+                    )
+                )
 
-            #count
-            counter[1] += 1
+                # url
+                entry_url = driver.current_url
+                entry_info.update(
+                    {
+                        'led_url': entry_url
+                    }
+                )
 
-            if entry_url not in out_dict.keys():
+                #count
+                counter[1] += 1
+
+                if entry_url not in out_dict.keys():
+                
+                    try:
+                        out_dict[entry_url] = deep_extract(
+                            driver,
+                            entry_url,
+                            out_dict,
+                            asset_type = asset_type
+                        )
+
+                    except Exception as e:
+                        out_dict[entry_url] = {}
+                        print(f'Error extraction of {district}: {current_page}: {entry_url}: {e}')
+
+                    finally:
+                        out_dict[entry_url].update(
+                            entry_info
+                        )
+
+                counter[0] += 1
+
+            except:
+                print('-'*30)
+                print('Page didnt load right')
             
-                try:
-                    out_dict[entry_url] = deep_extract(
-                        driver,
-                        entry_url,
-                        out_dict,
-                        asset_type = asset_type
-                    )
-
-                except Exception as e:
-                    out_dict[entry_url] = {}
-                    print(f'Error extraction of {district}: {current_page}: {entry_url}: {e}')
-
-                finally:
-                    out_dict[entry_url].update(
-                        entry_info
-                    )
-
-            # close tab
-            driver.close()
-            driver.switch_to.window(driver.window_handles[0])
-
-            counter[0] += 1
+            finally:
+                # close tab
+                driver.close()
+                driver.switch_to.window(driver.window_handles[0])
 
         next_button = driver\
         .find_elements_by_xpath(
