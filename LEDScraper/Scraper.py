@@ -378,74 +378,78 @@ def scraper_extract(driver, out_dict, province, district):
             def format_number(string):
                 return np.round(float(string.replace('-','0').replace(',','')),4)
 
-            # initial entry info
-            entry_info = {
-                'lot_no': entry.find_elements_by_css_selector('td')[0].text,
-                'sequence_no': entry.find_elements_by_css_selector('td')[1].text,
-                'case_id': entry.find_elements_by_css_selector('td')[2].text,
-                'asset_type': entry.find_elements_by_css_selector('td')[3].text,
-                'area_rai': format_number(entry.find_elements_by_css_selector('td')[4].text),
-                'area_ngan': format_number(entry.find_elements_by_css_selector('td')[5].text),
-                'area_sqwam': format_number(entry.find_elements_by_css_selector('td')[6].text),
-                'assigned_start_price': format_number(entry.find_elements_by_css_selector('td')[7].text),
-                'subdistrict': entry.find_elements_by_css_selector('td')[8].text.replace(' ',''),
-                'district': entry.find_elements_by_css_selector('td')[9].text.replace(' ',''),
-                'province': province.replace(' ','')
-            }
+            entry_id = '|'.join([
+              x.text.strip() for x in entry.find_elements_by_css_selector('td')
+            ])
 
-            # enter entry
-            entry.click()
-            driver.switch_to.window(driver.window_handles[1])
+            if entry_id not in out_dict.keys():
 
-            try:
-                # detect a 
-                wait = WebDriverWait(driver, 5)\
-                .until(
-                    EC.presence_of_element_located(
-                        (By.XPATH, '/html/body/div[1]/div/div/div[1]/table[2]/tbody/tr/td[1]/strong/font/font')
+                # initial entry info
+                entry_info = {
+                    'lot_no': entry.find_elements_by_css_selector('td')[0].text,
+                    'sequence_no': entry.find_elements_by_css_selector('td')[1].text,
+                    'case_id': entry.find_elements_by_css_selector('td')[2].text,
+                    'asset_type': entry.find_elements_by_css_selector('td')[3].text,
+                    'area_rai': format_number(entry.find_elements_by_css_selector('td')[4].text),
+                    'area_ngan': format_number(entry.find_elements_by_css_selector('td')[5].text),
+                    'area_sqwam': format_number(entry.find_elements_by_css_selector('td')[6].text),
+                    'assigned_start_price': format_number(entry.find_elements_by_css_selector('td')[7].text),
+                    'subdistrict': entry.find_elements_by_css_selector('td')[8].text.replace(' ',''),
+                    'district': entry.find_elements_by_css_selector('td')[9].text.replace(' ',''),
+                    'province': province.replace(' ','')
+                }
+
+                # enter entry
+                entry.click()
+                driver.switch_to.window(driver.window_handles[1])
+
+                # try loading
+                try:
+                    # detect a 
+                    wait = WebDriverWait(driver, 5)\
+                    .until(
+                        EC.presence_of_element_located(
+                            (By.XPATH, '/html/body/div[1]/div/div/div[1]/table[2]/tbody/tr/td[1]/strong/font/font')
+                        )
                     )
-                )
 
-                # url
-                entry_url = driver.current_url
-                entry_info.update(
-                    {
-                        'led_url': entry_url
-                    }
-                )
+                    # pick up url
+                    entry_url = driver.current_url
+                    entry_info.update(
+                        {
+                            'led_url': entry_url
+                        }
+                    )
 
-                #count
-                counter[1] += 1
+                    # status
+                    print('-'*30)
+                    print(f'Successfully loaded: {entry_url}')
 
-                if entry_url not in out_dict.keys():
+                    if entry_url == 'about:blank':
+                        raise(Exception)
+                    
+                    # extract
+                    out_dict[entry_id] = deep_extract(
+                        driver,
+                        entry_id,
+                        out_dict,
+                        asset_type = asset_type
+                    )
+
+                except:
+                    print('-'*30)
+                    print(f'Page didnt load right: {entry_id}')
+
+                    out_dict[entry_id] = {}
+                    print(f'Error extraction of {district}: {current_page}: {entry_id}: {e}')
                 
-                    try:
-                        out_dict[entry_url] = deep_extract(
-                            driver,
-                            entry_url,
-                            out_dict,
-                            asset_type = asset_type
-                        )
-
-                    except Exception as e:
-                        out_dict[entry_url] = {}
-                        print(f'Error extraction of {district}: {current_page}: {entry_url}: {e}')
-
-                    finally:
-                        out_dict[entry_url].update(
-                            entry_info
-                        )
-
-                counter[0] += 1
-
-            except:
-                print('-'*30)
-                print('Page didnt load right')
-            
-            finally:
-                # close tab
-                driver.close()
-                driver.switch_to.window(driver.window_handles[0])
+                finally:
+                    # close tab
+                    out_dict[entry_id].update(
+                        entry_info
+                    )
+                    driver.close()
+                    driver.switch_to.window(driver.window_handles[0])
 
         next_button = driver\
         .find_elements_by_xpath(

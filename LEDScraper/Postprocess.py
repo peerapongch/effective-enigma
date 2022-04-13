@@ -170,7 +170,7 @@ def clean_deed(deed_str):
 def find_location(
     entry,
     driver=None,
-    max_locations_per_entry=3,
+    max_locations_per_entry=1,
     max_wait_time=5,
     driver_path='./chromedriver.exe',
     led_search_url='https://landsmaps.dol.go.th/',
