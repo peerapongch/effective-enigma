@@ -355,7 +355,8 @@ def load_loc_search_page(
 def run_location_finder(
     driver,
     data,
-    location_search_url = 'https://landsmaps.dol.go.th/'
+    location_search_url = 'https://landsmaps.dol.go.th/',
+    entry_tolerance = 10
     ):
 
     do_find = data[
@@ -373,22 +374,13 @@ def run_location_finder(
         pass_counter = 0
         last_coor = '0,0'
 
+        load_loc_search_page(driver,location_search_url)
+
         for index, row in do_find.iterrows():
-            # do_find[[
-            #     'loc_coordinates',
-            #     'loc_google_maps',
-            #     'loc_price_per_unit',
-            #     'loc_district',
-            #     'loc_deed',
-            #     'loc_possibilities'
-            # ]] = do_find.apply(
-            #     find_location,
-            #     axis=1,
-            #     driver=driver
-            # )
-            if counter % 10 == 0:
-                load_loc_search_page(driver,location_search_url)
-            counter += 1
+
+            # if counter % 10 == 0:
+            #     load_loc_search_page(driver,location_search_url)
+            # counter += 1
 
             row_update = find_location(
                 row,
@@ -400,7 +392,7 @@ def run_location_finder(
                 row_update[0] = row_update[1].replace('%20','').split('=')[1]
 
             # reject results conditions
-            if (row_update[0]=='') or (row_update[0]==last_coor):
+            if (row_update[0] in ['','NA']) or (row_update[0]==last_coor):
                 # skipping update because it is shit
                 pass_counter += 1
             else:
@@ -418,11 +410,11 @@ def run_location_finder(
 
                 last_coor = row_update[0] # for next search
             
-            if pass_counter>10:
+            if pass_counter>entry_tolerance:
                 break
         
         cant_find_any = all([x == 'NA' for x in do_find['loc_coordinates'].tolist()])
-        loc_last_status = 'failure' if cant_find_any else 'success'
+        loc_last_status = 'failure' if cant_find_any and (do_find.shape[0]>entry_tolerance) else 'success'
 
     else:
         print('-'*30)

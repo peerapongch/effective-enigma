@@ -32,10 +32,12 @@ def make_sequence(pointer,original_seq):
 
 if __name__ == "__main__":
 
+	proxy = '8.213.129.34:80'
 	options = Options()
 	# options.headless = HEADLESS
 	options.add_argument("--window-size=1920,1080")
 	options.add_argument("--start-maximized")
+	options.add_argument(f"--proxy-server={proxy}")
 	if HEADLESS:
 		options.add_argument("--headless")
 		options.add_argument("--disable-gpu")
