@@ -63,7 +63,7 @@ if __name__ == "__main__":
 			district_dict = LED_DISTRICT_ID[province]
 
 			district_id_seq = make_sequence(
-				STATE['last_district_id'],
+				STATE['last_district_id']+1,
 				PROVINCE_SCOPE[province]
 			)
 
@@ -104,31 +104,32 @@ if __name__ == "__main__":
 					district
 				)
 
-				# postprocess
-				out_db = run_postprocess(
-					out_dict
-				)
-				
-				# find location
-				if do_find_location:
-					print('-'*30)
-					print('Performing location search')
-					out_db, loc_last_time, loc_last_status = run_location_finder(
-						driver,
-						out_db
+				if len(out_dict)>0:
+					# postprocess
+					out_db = run_postprocess(
+						out_dict
 					)
-				else:
-					print('-'*30)
-					print('Skipping location search')
-				print(f'Last {loc_last_status} search at {loc_last_time}')
-				
-				# save
-				save_db(
-					out_db,
-					data_dir = DATA_DIR,
-					province = eng_province,
-					district_id = str(district_id)
-				)
+					
+					# find location
+					if do_find_location:
+						print('-'*30)
+						print('Performing location search')
+						out_db, loc_last_time, loc_last_status = run_location_finder(
+							driver,
+							out_db
+						)
+					else:
+						print('-'*30)
+						print('Skipping location search')
+					print(f'Last {loc_last_status} search at {loc_last_time}')
+					
+					# save
+					save_db(
+						out_db,
+						data_dir = DATA_DIR,
+						province = eng_province,
+						district_id = str(district_id)
+					)
 
 				STATE = set_state(STATE, 'last_province', province)
 				STATE = set_state(STATE, 'last_district_id', district_id)

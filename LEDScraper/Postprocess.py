@@ -43,6 +43,9 @@ def run_postprocess(out_dict):
     data = pd.DataFrame.from_dict(out_dict,orient='index')\
     .reset_index().rename({'index':'entry_id'},axis=1)
 
+    # postprocess: columns and nulls
+    data = correct_columns(data)
+
     # postprocess: area
     data['total_area_sqwa'] = [
         z/4 if a.find('ห้องชุด')!=-1 else x*400+y*100+z for x,y,z,a in zip(
@@ -60,9 +63,6 @@ def run_postprocess(out_dict):
             data['asset_type']
         )
     ]
-
-    # postprocess: columns and nulls
-    data = correct_columns(data)
 
     # postprocess: price
     data['max_start_thb_per_sqwa'] = data['max_start_price']/data['total_area_sqwa']
@@ -88,8 +88,10 @@ def run_postprocess(out_dict):
     # postprocess: auction rounds
     data['all_auction_status'] = data[auction_status_cols].agg('|'.join, axis=1)
     data['asset_status'] = [
-        'unavailable' if (x.find('ขายได้')!=-1) | (x.find('ถอน')!=-1) else 'available' for x in data['all_auction_status']
+        'unavailable' if (x.find('ขายได้')!=-1) | (x.find('ถอน')!=-1) | (x.find('งดขายในนัดที่เหลือ')!=-1) else 'available' for x in data['all_auction_status']
     ]
+
+    # debug
     data[['next_date','next_round']] = \
     data[auction_date_cols+['asset_status']].apply(earliest_next,axis=1)
 
@@ -196,13 +198,15 @@ def find_location(
 
     possible_locations = []
     
-    if entry['deed_no'] is not np.nan:
+    if entry['deed_no'] not in ['',np.nan]:
 
         entry_province = entry['province']
         entry_district = entry['district']
 
         clean_province = PROVINCE_MAPPER[entry_province]
         possible_districts = DISTRICT_MAPPER[entry_province][entry_district.replace(' ','')]
+
+        terminate = False
 
         # print(possible_districts)
 
@@ -211,6 +215,9 @@ def find_location(
             # print(entry['deed_no'].split(','))
             
             for deed in entry['deed_no'].split(','):
+
+                print('-'*30)
+                print(f'Searching {d}:{deed}')
 
                 wait = WebDriverWait(driver, max_wait_time)\
                 .until(
@@ -257,25 +264,37 @@ def find_location(
                         )
                     )
                     
+                    # to clean up try catch
                     time.sleep(2)
-                    
-                    coor = driver.find_elements_by_xpath(
-                        '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[10]/div[2]/a'
-                    )[0].text
+                    try:
+                        coor = driver.find_elements_by_xpath(
+                            '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[10]/div[2]/a'
+                        )[0].text
+                    except:
+                        print('fucked up coor')
 
-                    gmap = driver.find_elements_by_xpath(
-                        '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[10]/div[2]/a'
-                    )[0].get_attribute('href')
+                    try:
+                        gmap = driver.find_elements_by_xpath(
+                            '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[10]/div[2]/a'
+                        )[0].get_attribute('href')
+                    except:
+                        print('fucked up gmaps')
 
-                    price = driver.find_elements_by_xpath(
-                        '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[9]/div[2]'
-                    )[0].text.split(' ')[0]
+                    try:
+                        price = driver.find_elements_by_xpath(
+                            '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[9]/div[2]'
+                        )[0].text.split(' ')[0]
+                    except:
+                        print('fucked up price')
 
-                    price_unit = driver.find_elements_by_xpath(
-                        '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[9]/div[2]'
-                    )[0].text.split(' ')[1]
+                    try:
+                        price_unit = driver.find_elements_by_xpath(
+                            '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[9]/div[2]'
+                        )[0].text.split(' ')[1]
+                    except:
+                        print('fucked up price unit')
 
-                    print(f'District: {d}; Deed: {deed}; Coordinates: {coor}; Price {price} {price_unit}; Gmap: {gmap}')
+                    # print(f'District: {d}; Deed: {deed}; Coordinates: {coor}; Price {price} {price_unit}; Gmap: {gmap}')
                     
                     possible_locations.append(
                         [
@@ -287,7 +306,8 @@ def find_location(
                         ]
                     )
                     
-                    if len(possible_locations) == max_locations_per_entry:
+                    terminate = len(possible_locations) == max_locations_per_entry
+                    if terminate:
                         break
                         
                 except Exception as e:
@@ -295,6 +315,13 @@ def find_location(
                     print(f'District: {d}; Deed: {deed}; Coordinates: NA; Price NA; Gmap: NA')
                     print(e)
                     pass
+
+                finally:
+                    print(f'Terminate: {str(terminate)}')
+                    print(f'Possible loc: {len(possible_locations)}')
+
+            if terminate:
+                break
                     
     if len(possible_locations)==0:
         possible_locations.append(['NA']*5)
@@ -305,12 +332,10 @@ def find_location(
     
     return pd.Series(results)
 
-def run_location_finder(
+def load_loc_search_page(
     driver,
-    data,
-    location_search_url = 'https://landsmaps.dol.go.th/'
-    ):
-
+    location_search_url
+):
     driver.get(location_search_url)
 
     # close landing layer if exists
@@ -327,13 +352,26 @@ def run_location_finder(
     except:
         print('button not found')
 
+def run_location_finder(
+    driver,
+    data,
+    location_search_url = 'https://landsmaps.dol.go.th/'
+    ):
+
     do_find = data[
         (data['asset_status']=='available')\
         & (data['loc_coordinates']=='NA')
     ]
     loc_last_status = 'success'
 
+    print('-'*30)
+    print(f'Finding: {do_find.shape[0]} locations')
+
     if do_find.shape[0]>0:
+
+        counter = 0
+        pass_counter = 0
+        last_coor = '0,0'
 
         for index, row in do_find.iterrows():
             # do_find[[
@@ -348,22 +386,40 @@ def run_location_finder(
             #     axis=1,
             #     driver=driver
             # )
+            if counter % 10 == 0:
+                load_loc_search_page(driver,location_search_url)
+            counter += 1
 
             row_update = find_location(
                 row,
                 driver=driver
             )
-            do_find.loc[
-                index,
-                [
-                    'loc_coordinates',
-                    'loc_google_maps',
-                    'loc_price_per_unit',
-                    'loc_district',
-                    'loc_deed',
-                    'loc_possibilities'
-                ]
-            ] = row_update.values
+            
+            # patchy correction
+            if (row_update[0]=='') and (row_update[1] not in ['NA','',None,np.nan]):
+                row_update[0] = row_update[1].replace('%20','').split('=')[1]
+
+            # reject results conditions
+            if (row_update[0]=='') or (row_update[0]==last_coor):
+                # skipping update because it is shit
+                pass_counter += 1
+            else:
+                do_find.loc[
+                    index,
+                    [
+                        'loc_coordinates',
+                        'loc_google_maps',
+                        'loc_price_per_unit',
+                        'loc_district',
+                        'loc_deed',
+                        'loc_possibilities'
+                    ]
+                ] = row_update.values
+
+                last_coor = row_update[0] # for next search
+            
+            if pass_counter>10:
+                break
         
         cant_find_any = all([x == 'NA' for x in do_find['loc_coordinates'].tolist()])
         loc_last_status = 'failure' if cant_find_any else 'success'
@@ -406,7 +462,7 @@ def test_find_location(
     print('-'*30)
     print('Testing location search with known deed')
     
-    driver.get(location_search_url)
+    driver.get(led_search_url)
 
     # close landing layer if exists
     try:

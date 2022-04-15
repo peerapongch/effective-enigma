@@ -372,6 +372,10 @@ def scraper_extract(driver, out_dict, province, district):
 
         for entry in tqdm(main_table.find_elements_by_css_selector('tr')):
 
+            if entry.text == 'ไม่พบข้อมูล':
+                print('No entries')
+                break
+
             asset_type = entry.find_elements_by_css_selector('td')[3].text
             asset_type = 'property' if asset_type!='หุ้น' else 'equity'
 
@@ -436,7 +440,7 @@ def scraper_extract(driver, out_dict, province, district):
                         asset_type = asset_type
                     )
 
-                except:
+                except Exception as e:
                     print('-'*30)
                     print(f'Page didnt load right: {entry_id}')
 
