@@ -347,7 +347,10 @@ def load_loc_search_page(
                 (By.XPATH, '/html/body/div[25]/div/div/div/div[1]/button/i')
             )
         )
-        time.sleep(2)
+    except:
+        print('page load failed')
+    
+    try:
         close = driver.find_elements_by_xpath('/html/body/div[25]/div/div/div/div[1]/button/i')
         close[0].click()
     except:
