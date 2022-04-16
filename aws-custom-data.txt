@@ -1,0 +1,27 @@
+#!/bin/bash
+
+sudo su ec2-user
+
+today=$(date +"%Y-%m-%d")
+
+(
+	aws configure set aws_access_key_id AKIASMQMNJAUWNSMBDGU
+
+	aws configure set aws_secret_access_key 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
+	
+	echo "Started ${today}" >> asg_start.log
+
+	aws s3 cp asg_start.log "s3://effective-enigma/log/${today}-asg_start.log"
+
+	git clone https://github.com/peerapongch/effective-enigma.git
+
+	cd effective-enigma
+
+	chmod 0755 chromedriver
+
+	python3 run_scraper.py>> asg_predict.log
+
+	aws s3 cp asg_predict.log "s3://effective-enigma/log/${today}-asg_predict.log"
+) >& asg.log
+
+aws s3 cp asg.log "s3://effective-enigma/log/${today}-asg.log"
