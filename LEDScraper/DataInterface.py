@@ -9,9 +9,18 @@ def get_existing_db(
   district_id=None,
   full_path=None
 ):
+  
+  filename = f'{province}_district{district_id}.pickle'
+  
+  # sync with s3 to temp
+  try:
+    os.system(f'aws s3 cp s3://effective-enigma/data/{filename} ./data/{filename}')
+  except:
+    print(f'No DB exists on S3: {filename}')
+
+  # read from temp to memory
   if not full_path:
 
-    filename = f'{province}_district{district_id}.pickle'
     full_path = os.path.join(
       data_dir,
       filename
@@ -34,9 +43,11 @@ def save_db(
   district_id=None,
   full_path=None
 ):
-  if not full_path:
 
-    filename = f'{province}_district{district_id}.pickle'
+  filename = f'{province}_district{district_id}.pickle'
+  
+  # write to temp
+  if not full_path:
     full_path = os.path.join(
       data_dir,
       filename
@@ -49,5 +60,11 @@ def save_db(
       'wb'
     )
   )
+
+  # push to s3
+  try:
+    os.system(f'aws s3 cp ./data/{filename} s3://effective-enigma/data/{filename}')
+  except:
+    print(f'Write failed --> CHEEECK: {filename}')
 
   return True
