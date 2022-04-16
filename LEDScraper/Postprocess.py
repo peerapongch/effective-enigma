@@ -319,7 +319,7 @@ def find_location(
                 finally:
                     print(f'Terminate: {str(terminate)}')
                     print(f'Possible loc: {len(possible_locations)}')
-                    print(possible_locations[0])
+                    print(possible_locations)
 
             if terminate:
                 break
