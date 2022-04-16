@@ -1,6 +1,7 @@
 from LEDScraper.Mappers import *
+import platform
 
-DRIVER_DIR = "./chromedriver.exe"
+DRIVER_DIR = "./chromedriver.exe" if platform.system()=='Windows' else "./chromedriver"
 HEADLESS = True
 
 DATA_DIR = './data'
@@ -12,3 +13,4 @@ PROVINCE_SCOPE = {
 }
 
 LOCATION_COOLDOWN = 14400
+LOCATION_SEARCH_LIMIT = 30

@@ -122,7 +122,8 @@ if __name__ == "__main__":
 						print('Performing location search')
 						out_db, loc_last_time, loc_last_status = run_location_finder(
 							driver,
-							out_db
+							out_db,
+							search_limit=LOCATION_SEARCH_LIMIT
 						)
 					else:
 						print('-'*30)

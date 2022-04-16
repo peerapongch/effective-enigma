@@ -357,7 +357,8 @@ def run_location_finder(
     driver,
     data,
     location_search_url = 'https://landsmaps.dol.go.th/',
-    entry_tolerance = 10
+    entry_tolerance = 10,
+    search_limit = 20
     ):
 
     do_find = data[
@@ -378,6 +379,8 @@ def run_location_finder(
         load_loc_search_page(driver,location_search_url)
 
         for index, row in do_find.iterrows():
+
+            counter += 1
 
             # if counter % 10 == 0:
             #     load_loc_search_page(driver,location_search_url)
@@ -411,7 +414,8 @@ def run_location_finder(
 
                 last_coor = row_update[0] # for next search
             
-            if pass_counter>entry_tolerance:
+            # limiter on search for quick checkpointing
+            if (pass_counter>entry_tolerance) or (counter==search_limit):
                 break
         
         cant_find_any = all([x == 'NA' for x in do_find['loc_coordinates'].tolist()])
