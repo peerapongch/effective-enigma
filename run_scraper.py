@@ -12,10 +12,10 @@ from LEDScraper.DataInterface import *
 
 def load_state():
 	#s3 to temp
-  try:
-    os.system(f'aws s3 cp s3://effective-enigma/state.pickle ./state.pickle')
-  except:
-    print(f'State not found')
+	try:
+		os.system(f'aws s3 cp s3://effective-enigma/state.pickle ./state.pickle')
+	except:
+		print(f'State not found')
 
 	# load from local
 	state_path = 'state.pickle'
@@ -32,10 +32,10 @@ def save_state(STATE):
 	pickle.dump(STATE,open('state.pickle','wb'))
 
 	try:
-    os.system(f'aws s3 cp ./state.pickle s3://effective-enigma/state.pickle')
-  except:
-    print(f'Write failed --> CHEEECK: state.pickle')
-		
+		os.system(f'aws s3 cp ./state.pickle s3://effective-enigma/state.pickle')
+	except:
+		print(f'Write failed --> CHEEECK: state.pickle')
+
 	return True
 
 def make_sequence(pointer,original_seq):
