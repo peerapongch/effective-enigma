@@ -39,8 +39,12 @@ if __name__ == "__main__":
 	options.add_argument("--start-maximized")
 	# options.add_argument(f"--proxy-server={proxy}")
 	if HEADLESS:
+		options.add_argument("--disable-web-security")
+		options.add_argument("--disable-site-isolation-trials")
 		options.add_argument("--headless")
 		options.add_argument("--disable-gpu")
+		user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.88 Safari/537.36'
+		options.add_argument(f"--user-agent={user_agent}")
 	driver = webdriver.Chrome(DRIVER_DIR, options=options)
 
 	loc_last_time = datetime.now()
