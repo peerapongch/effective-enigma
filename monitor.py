@@ -2,8 +2,13 @@ import pickle
 import glob
 import pandas as pd
 from tqdm import tqdm
+import os
 
 def run():
+  os.system(
+    'aws s3 cp --recursive s3://effective-enigma/data/ ./data/'
+  )
+
   files = glob.glob('./data/bangkok_district*.pickle')
   data = pd.DataFrame()
 

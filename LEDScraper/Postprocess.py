@@ -173,7 +173,7 @@ def find_location(
     entry,
     driver=None,
     max_locations_per_entry=1,
-    max_wait_time=5,
+    max_wait_time=2,
     driver_path='./chromedriver.exe',
     led_search_url='https://landsmaps.dol.go.th/',
     headless=False
@@ -242,21 +242,7 @@ def find_location(
                 deed_box.send_keys(Keys.ENTER)
 
                 try:
-                    # elemets = [
-                    #     '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[10]/div[2]/a',
-                    #     '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[10]/div[2]/a',
-                    #     '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[9]/div[2]',
-                    #     '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[9]/div[2]'
-                    # ]
-                    # for elem in elements:
-                    #     WebDriverWait(driver, max_wait_time/4)\
-                    #     .until(
-                    #         EC.presence_of_element_located(
-                    #             (By.XPATH, elem)
-                    #         )
-                    #     )
-                    # time.sleep(max_wait_time)
-                    # WebDriverWait(driver, max_wait_time)
+
                     wait = WebDriverWait(driver, max_wait_time)\
                     .until(
                         EC.presence_of_element_located(
@@ -276,7 +262,7 @@ def find_location(
                     try:
                         gmap = driver.find_elements_by_xpath(
                             '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[10]/div[2]/a'
-                        )[0].get_attribute('href')
+                        )[0].get_attribute('href').replace('%20','')
                     except:
                         print('fucked up gmaps')
 
@@ -335,13 +321,14 @@ def find_location(
 
 def load_loc_search_page(
     driver,
-    location_search_url
+    location_search_url,
+    wait_time = 3
 ):
     driver.get(location_search_url)
 
     # close landing layer if exists
     try:
-        wait = WebDriverWait(driver, 60)\
+        wait = WebDriverWait(driver, wait_time)\
         .until(
             EC.presence_of_element_located(
                 (By.XPATH, '/html/body/div[25]/div/div/div/div[1]/button/i')
