@@ -11,6 +11,13 @@ from LEDScraper.Mappers import *
 from LEDScraper.DataInterface import *
 
 def load_state():
+	#s3 to temp
+  try:
+    os.system(f'aws s3 cp s3://effective-enigma/state.pickle ./state.pickle')
+  except:
+    print(f'State not found')
+
+	# load from local
 	state_path = 'state.pickle'
 	if os.path.isfile(state_path):
 		return pickle.load(open(state_path,'rb'))
@@ -23,6 +30,12 @@ def set_state(STATE,var,value):
 
 def save_state(STATE):
 	pickle.dump(STATE,open('state.pickle','wb'))
+
+	try:
+    os.system(f'aws s3 cp ./state.pickle s3://effective-enigma/state.pickle')
+  except:
+    print(f'Write failed --> CHEEECK: state.pickle')
+		
 	return True
 
 def make_sequence(pointer,original_seq):
@@ -41,6 +54,9 @@ if __name__ == "__main__":
 	if HEADLESS:
 		options.add_argument("--disable-web-security")
 		options.add_argument("--disable-site-isolation-trials")
+		options.add_argument('--no-proxy-server')
+		options.add_argument("--proxy-server='direct://'")
+		options.add_argument("--proxy-bypass-list=*")
 		options.add_argument('--no-sandbox')
 		options.add_argument("--headless")
 		options.add_argument("--disable-gpu")
