@@ -10,6 +10,7 @@ from selenium.webdriver.support import expected_conditions as EC
 import pandas as pd
 import numpy as np
 import time
+from tqdm import tqdm
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
@@ -128,10 +129,7 @@ def run_postprocess(out_dict):
     
     return data[new_cols]
 
-def correct_columns(
-    data,
-    max_schema=MAX_SCHEMA
-):
+def correct_columns(data,max_schema=MAX_SCHEMA):
     current_cols = data.columns
     for col in max_schema.keys():
         if col not in current_cols:
@@ -176,7 +174,8 @@ def find_location(
     max_wait_time=2,
     driver_path='./chromedriver.exe',
     led_search_url='https://landsmaps.dol.go.th/',
-    headless=False
+    headless=False,
+    deed_limit=10
     ):
 
     if not driver:
@@ -195,10 +194,10 @@ def find_location(
         prov_select = Select(driver.find_elements_by_xpath('/html/body/nav/form[1]/div/select')[0])
         prov_select.select_by_visible_text('กรุงเทพมหานคร')
 
-
     possible_locations = []
-    
-    if entry['deed_no'] not in ['',np.nan]:
+    n_stale = 0
+
+    if entry['deed_no'] not in ['',None,np.nan]:
 
         entry_province = entry['province']
         entry_district = entry['district']
@@ -214,7 +213,10 @@ def find_location(
             
             # print(entry['deed_no'].split(','))
             
-            for deed in entry['deed_no'].split(','):
+            # imposed limit to 10 deeds
+            deed_list = entry['deed_no'].split(',')
+            upto = min(deed_limit,len(entry['deed_no'].split(',')))
+            for deed in deed_list[:upto]:
 
                 print('-'*30)
                 print(f'Searching {d}:{deed}')
@@ -250,38 +252,28 @@ def find_location(
                         )
                     )
                     
-                    # to clean up try catch
-                    time.sleep(2)
-                    try:
-                        coor = driver.find_elements_by_xpath(
-                            '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[10]/div[2]/a'
-                        )[0].text
-                    except:
-                        print('fucked up coor')
+                    # wait time for page to respond
+                    time.sleep(4)
 
-                    try:
-                        gmap = driver.find_elements_by_xpath(
-                            '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[10]/div[2]/a'
-                        )[0].get_attribute('href').replace('%20','')
-                    except:
-                        print('fucked up gmaps')
+                    coor = driver.find_elements_by_xpath(
+                        '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[10]/div[2]/a'
+                    )[0].text
 
-                    try:
-                        price = driver.find_elements_by_xpath(
-                            '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[9]/div[2]'
-                        )[0].text.split(' ')[0]
-                    except:
-                        print('fucked up price')
+                    gmap = driver.find_elements_by_xpath(
+                        '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[10]/div[2]/a'
+                    )[0].get_attribute('href').replace('%20','')
 
-                    try:
-                        price_unit = driver.find_elements_by_xpath(
-                            '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[9]/div[2]'
-                        )[0].text.split(' ')[1]
-                    except:
-                        print('fucked up price unit')
+                    price = driver.find_elements_by_xpath(
+                        '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[9]/div[2]'
+                    )[0].text.split(' ')[0]
 
-                    # print(f'District: {d}; Deed: {deed}; Coordinates: {coor}; Price {price} {price_unit}; Gmap: {gmap}')
+                    price_unit = driver.find_elements_by_xpath(
+                        '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[9]/div[2]'
+                    )[0].text.split(' ')[1]
                     
+                    if (coor=='') and (gmap not in ['NA','',None,np.nan]):
+                        coor = gmap.split('=')[1]
+
                     possible_locations.append(
                         [
                             coor,
@@ -297,7 +289,7 @@ def find_location(
                         break
                         
                 except Exception as e:
-                    
+                    n_stale += 1
                     print(f'District: {d}; Deed: {deed}; Coordinates: NA; Price NA; Gmap: NA')
                     print(e)
                     pass
@@ -317,17 +309,14 @@ def find_location(
     results = [*possible_locations[0],str(possible_locations)]
     # print(results)
     
-    return pd.Series(results)
+    return pd.Series(results), n_stale
 
-def load_loc_search_page(
-    driver,
-    location_search_url,
-    wait_time = 3
-):
-    driver.get(location_search_url)
+def load_loc_search_page(driver,location_search_url,wait_time = 3):
 
     # close landing layer if exists
     try:
+        driver.get(location_search_url)
+        
         wait = WebDriverWait(driver, wait_time)\
         .until(
             EC.presence_of_element_located(
@@ -335,8 +324,10 @@ def load_loc_search_page(
             )
         )
     except:
-        print('page load failed')
-    
+        print('This weird thing ')
+
+    time.sleep(2)
+
     try:
         close = driver.find_elements_by_xpath('/html/body/div[25]/div/div/div/div[1]/button/i')
         close[0].click()
@@ -348,14 +339,25 @@ def run_location_finder(
     data,
     location_search_url = 'https://landsmaps.dol.go.th/',
     entry_tolerance = 10,
-    search_limit = 20
+    deed_tolerance = 20,
+    search_limit = 50
     ):
 
-    do_find = data[
-        (data['asset_status']=='available')\
-        & (data['loc_coordinates']=='NA')
-    ]
-    loc_last_status = 'success'
+    find_cond = (
+        data['asset_status']=='available'
+    ) & (
+        data['loc_coordinates']=='NA'
+    ) & (
+        (
+            pd.Series([(x-y).total_seconds()<7200 for x,y in zip(data['last_updated'],data['created_on'])])
+        ) | (
+            pd.Series([(datetime.now()-x).total_seconds()>172800 for x in data['last_updated']])
+        )
+    )
+
+    do_find = data[find_cond]
+    dont_find = data[~find_cond]
+    loc_last_status = 'success' # default value
 
     print('-'*30)
     print(f'Finding: {do_find.shape[0]} locations')
@@ -363,83 +365,78 @@ def run_location_finder(
     if do_find.shape[0]>0:
 
         counter = 0
-        pass_counter = 0
+        stale_entry_counter = 0
+        n_stale = 0 # deed stale counter
         last_coor = '0,0'
+        last_deed = 'NA'
+        
 
         load_loc_search_page(driver,location_search_url)
 
-        for index, row in do_find.iterrows():
+        for index, row in tqdm(do_find.iterrows(), total=do_find.shape[0]):
 
             counter += 1
 
-            # if counter % 10 == 0:
-            #     load_loc_search_page(driver,location_search_url)
-            # counter += 1
-
-            row_update = find_location(
+            row_update, this_n_stale = find_location(
                 row,
                 driver=driver
             )
-            
-            # patchy correction
-            if (row_update[0]=='') and (row_update[1] not in ['NA','',None,np.nan]):
-                row_update[0] = row_update[1].replace('%20','').split('=')[1]
+            n_stale += this_n_stale # counting total stale deed searches
+            print(f'Current stale deed count: {n_stale}')
 
             # reject results conditions
-            if (row_update[0] in ['','NA']) or (row_update[0]==last_coor):
+            stale_entry = (row_update[0]==last_coor) and (row_update[4]!=last_deed)
+            if stale_entry:
                 # skipping update because it is shit
-                pass_counter += 1
-            else:
-                do_find.loc[
-                    index,
-                    [
-                        'loc_coordinates',
-                        'loc_google_maps',
-                        'loc_price_per_unit',
-                        'loc_district',
-                        'loc_deed',
-                        'loc_possibilities'
-                    ]
-                ] = row_update.values
+                stale_entry_counter += 1
+                print(f'Found stale entry: {stale_entry_counter}')
 
-                last_coor = row_update[0] # for next search
+                # last_coor = '0.0' # for next search
+                # last_deed = 'NA' # for next search
+            else:
+                # entry isnt stale
+                # but the underlying deed search may be stale or just cannot find anything which confounds staleness
+                if row_update[0]!='NA':
+                    stale_entry_counter = 0
+                    n_stale = 0
+                    print(f'Reset -- pass counter: {stale_entry_counter}; n_stale: {n_stale}')
+
+                    do_find.loc[
+                        index,
+                        [
+                            'loc_coordinates',
+                            'loc_google_maps',
+                            'loc_price_per_unit',
+                            'loc_district',
+                            'loc_deed',
+                            'loc_possibilities'
+                        ]
+                    ] = row_update.values
+
+                    last_coor = row_update[0] # for next search
+                    last_deed = row_update[4] # for next search
+
+                do_find.loc[index,'last_updated'] = datetime.now()
             
             # limiter on search for quick checkpointing
-            if (pass_counter>entry_tolerance) or (counter==search_limit):
+            if stale_entry_counter>entry_tolerance:
+                print(f'Too many stale entries: {stale_entry_counter}')
+                loc_last_status = 'failure'
                 break
-        
-        cant_find_any = all([x == 'NA' for x in do_find['loc_coordinates'].tolist()])
-        loc_last_status = 'failure' if cant_find_any and (do_find.shape[0]>entry_tolerance) else 'success'
+            if n_stale>deed_tolerance:
+                print(f'Too many stale deeds: {n_stale}')
+                loc_last_status = 'failure'
+                break
+            if counter>search_limit:
+                print(f'Search limit reached: {search_limit}')
+                break
 
     else:
         print('-'*30)
         print('No location to search')
         # loc_last_status remains success
 
-    dont_find = data[
-        ~(data['asset_status']=='available')\
-        | ~(data['loc_coordinates']=='NA')
-    ]
-
     return pd.concat([do_find,dont_find]), datetime.now(), loc_last_status
-
-def if_find_location(
-    driver,
-    loc_last_time,
-    loc_last_status,
-    cooldown=10800
-    ):
-
-    do_find_loc = False
-
-    if loc_last_status == 'success':
-        do_find_loc = True
-    elif (datetime.now()-loc_last_time).seconds>cooldown:
-        loc_last_time, loc_last_status = test_find_location(driver)
-        if loc_last_status == 'success':
-            do_find_loc = True
-
-    return do_find_loc, loc_last_time, loc_last_status
 
 def test_find_location(
     driver,
@@ -448,41 +445,41 @@ def test_find_location(
     
     print('-'*30)
     print('Testing location search with known deed')
-    
-    driver.get(led_search_url)
 
     # close landing layer if exists
     try:
-        wait = WebDriverWait(driver, 60)\
-        .until(
-            EC.presence_of_element_located(
-                (By.XPATH, '/html/body/div[25]/div/div/div/div[1]/button/i')
-            )
-        )
-        time.sleep(2)
-        close = driver.find_elements_by_xpath('/html/body/div[25]/div/div/div/div[1]/button/i')
-        close[0].click()
-    except:
-        print('button not found')
+        load_loc_search_page(driver,led_search_url)
 
-    prov_select = Select(driver.find_elements_by_xpath('/html/body/nav/form[1]/div/select')[0])
-    prov_select.select_by_visible_text('กรุงเทพมหานคร')
+        # time.sleep(8)
 
-    district_select = Select(driver.find_elements_by_xpath('/html/body/nav/form[2]/div/select')[0])
-    district_select.select_by_visible_text('38-ลาดพร้าว')
+        # wait = WebDriverWait(driver, 10)\
+        # .until(
+        #     EC.presence_of_element_located(
+        #         (By.XPATH, '/html/body/div[25]/div/div/div/div[1]/button/i')
+        #     )
+        # )
+        # try:
+        #     close = driver.find_elements_by_xpath('/html/body/div[25]/div/div/div/div[1]/button/i')
+        #     close[0].click()
+        # except:
+        #     print('button not found')
 
-    deed_box = driver\
-    .find_elements_by_xpath(
-        '/html/body/nav/form[3]/span/input'
-    )[0]
+        prov_select = Select(driver.find_elements_by_xpath('/html/body/nav/form[1]/div/select')[0])
+        prov_select.select_by_visible_text('กรุงเทพมหานคร')
 
-    deed_box.clear()
-    deed_box.send_keys('2234')
-    deed_box.send_keys(Keys.ENTER)
+        district_select = Select(driver.find_elements_by_xpath('/html/body/nav/form[2]/div/select')[0])
+        district_select.select_by_visible_text('38-ลาดพร้าว')
 
-    try:
+        deed_box = driver\
+        .find_elements_by_xpath(
+            '/html/body/nav/form[3]/span/input'
+        )[0]
 
-        wait = WebDriverWait(driver, max_wait_time)\
+        deed_box.clear()
+        deed_box.send_keys('2234')
+        deed_box.send_keys(Keys.ENTER)
+
+        wait = WebDriverWait(driver, 2)\
         .until(
             EC.presence_of_element_located(
                 (By.XPATH, '/html/body/div[1]/div[3]/span/div/div[2]/div[2]/div/div[2]/div[9]/div[2]')
@@ -510,12 +507,31 @@ def test_find_location(
         loc_last_status = 'success'
 
         print('-'*30)
-        print('Time out expired: Location search activated')
+        print('Driver working properly')
             
     except Exception as e:
 
         loc_last_status = 'failure'
         print('-'*30)
-        print('Time out persists: Consider increasing cooldown value')
+        print('Something\'s wrong')
 
     return datetime.now(), loc_last_status
+
+# deprecated
+def if_find_location(
+    driver,
+    loc_last_time,
+    loc_last_status,
+    cooldown=10800
+    ):
+
+    do_find_loc = False
+
+    if loc_last_status == 'success':
+        do_find_loc = True
+    elif (datetime.now()-loc_last_time).total_seconds()>cooldown:
+        loc_last_time, loc_last_status = test_find_location(driver)
+        if loc_last_status == 'success':
+            do_find_loc = True
+
+    return do_find_loc, loc_last_time, loc_last_status

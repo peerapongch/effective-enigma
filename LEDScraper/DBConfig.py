@@ -1,3 +1,6 @@
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+
 MAX_SCHEMA = {
   'entry_id': 'NA', 
   'ลำดับที่': 'NA',
@@ -59,5 +62,7 @@ MAX_SCHEMA = {
   'loc_price_per_unit': 'NA',
   'loc_district': 'NA',
   'loc_deed': 'NA',
-  'loc_possibilities': 'NA'
+  'loc_possibilities': 'NA',
+  'created_on': datetime.now() - relativedelta(days=7),
+  'last_updated': datetime.now() - relativedelta(days=7)
 }

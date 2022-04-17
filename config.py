@@ -2,7 +2,7 @@ from LEDScraper.Mappers import *
 import platform
 
 DRIVER_DIR = "./chromedriver.exe" if platform.system()=='Windows' else "./chromedriver"
-HEADLESS = True
+HEADLESS = False
 
 DATA_DIR = './data'
 LED_SEARCH_URL = 'http://asset.led.go.th/newbidreg/default.asp'

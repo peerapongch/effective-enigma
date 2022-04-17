@@ -11,6 +11,7 @@ import numpy as np
 import os
 import pickle
 from tqdm import tqdm
+from datetime import datetime
 
 def select_province(driver, province='กรุงเทพมหานคร'):
     # province selection
@@ -352,14 +353,16 @@ def get_page_info(driver):
     current_page, total_pages = page_object.text.replace('หน้าที่','').strip().split('/')
     return int(current_page), int(total_pages)
 
-def scraper_extract(driver, out_dict, province, district):
+def scraper_extract(driver, out_dict, province, district, page_limit=999):
     current_page, total_pages = get_page_info(driver)
     counter = [0,0]
 
     print('-'*30)
     print(f'Total Pages: {total_pages}')
 
-    while current_page <= total_pages:
+    to_page = min(page_limit,total_pages)
+
+    while current_page <= to_page:
 
         # get listing table
         main_table = driver\
@@ -400,7 +403,9 @@ def scraper_extract(driver, out_dict, province, district):
                     'assigned_start_price': format_number(entry.find_elements_by_css_selector('td')[7].text),
                     'subdistrict': entry.find_elements_by_css_selector('td')[8].text.replace(' ',''),
                     'district': entry.find_elements_by_css_selector('td')[9].text.replace(' ',''),
-                    'province': province.replace(' ','')
+                    'province': province.replace(' ',''),
+                    'created_on': datetime.now(),
+                    'last_updated': datetime.now()
                 }
 
                 # enter entry
