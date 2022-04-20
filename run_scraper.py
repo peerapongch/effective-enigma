@@ -96,11 +96,15 @@ def make_driver():
 			options.add_argument("--window-size=1920,1080")
 			options.add_argument("--start-maximized")
 
+			print('did you get here?')
+			
 			driver = webdriver.Chrome(
 				DRIVER_DIR,
 				options=options,
 				seleniumwire_options=proxy_options
 			)
+
+			print('did you get here?')
 
 			driver.get('http://httpbin.org/ip')
 			driver.find_element_by_xpath('/html/body/pre')
@@ -126,6 +130,12 @@ if __name__ == "__main__":
 	# setting driver status for checking
 	loc_last_time = datetime.now()
 	loc_last_status = 'failure'
+
+	# manually setting state
+	STATE = {}
+	STATE = set_state(STATE, 'last_province', 'ภูเก็ต')
+	STATE = set_state(STATE, 'last_district_id', 0)
+	save_state(STATE)
 
 	# get state
 	STATE = load_state()
@@ -186,7 +196,7 @@ if __name__ == "__main__":
 						in_dict.copy(),
 						province,
 						district,
-						page_limit=1
+						page_limit=SCRAPER_PAGE_LIMIT
 					)
 
 					if len(out_dict)>0:
